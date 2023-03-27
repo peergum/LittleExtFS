@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "LittleExtFS-RK.h"
+#include "LittleExtFS.h"
 
 #include <stdint.h>
 #include <stdbool.h>

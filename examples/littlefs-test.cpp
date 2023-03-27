@@ -1,7 +1,7 @@
 
 #include "Particle.h"
 
-#include "LittleExtFS-RK.h"
+#include "LittleExtFS.h"
 
 #include <fcntl.h>
 
