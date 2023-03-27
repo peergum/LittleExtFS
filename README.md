@@ -1,35 +1,83 @@
-# littlefs-test
+# LittleExtFS
 
-A Particle project named littlefs-test
+**Acknowledgment and Disclaimer:** This is a slightly modified version of [LittleFS-RK](https://github.com/rickkas7/LittleFS-RK) library, adapted to run on Gen 3 Particle devices (tested on a Boron). It's a worse derived version from the original in a sense, since the posix functions (open, read, write, close,...) will **not** work on this version and are instead replaced with equivalents prefixed with *lefs_*. Don't blame me, the posix functions are implemented in the deviceOS, so there's not much I can do to fix that (or maybe there is, and someone will improve that).
 
-## Welcome to your project!
+Port of LittleFS for Particle Gen 3 devices (external memory chip, as opposed to Particle's own implementation of LittleFS on the 2MB internal memory).
 
-Every new Particle project is composed of 3 important elements that you'll see have been created in your project directory for littlefs-test.
+**Warning:** This only works on Gen 3 devices (Argon, Boron, B Series...), although I actually **only** tested it on the Boron! For Gen 2 devices, please use Rick's version instead.
 
-#### ```/src``` folder:  
-This is the source folder that contains the firmware files for your project. It should *not* be renamed. 
-Anything that is in this folder when you compile your project will be sent to our compile service and compiled into a firmware binary for the Particle device that you have targeted.
+**Warning:** As this point in time, it's just a proof-of-concept for testing. There are almost certainly still bugs that haven't been found yet as it has not been extensively tested yet!
 
-If your application contains multiple files, they should all be included in the `src` folder. If your firmware depends on Particle libraries, those dependencies are specified in the `project.properties` file referenced below.
+- This is based on the Particle LittleFS implementation in Device OS: [https://github.com/particle-iot/device-os/tree/develop/third_party/littlefs](https://github.com/particle-iot/device-os/tree/develop/third_party/littlefs).
 
-#### ```.ino``` file:
-This file is the firmware that will run as the primary application on your Particle device. It contains a `setup()` and `loop()` function, and can be written in Wiring or C/C++. For more information about using the Particle firmware API to create firmware for your Particle device, refer to the [Firmware Reference](https://docs.particle.io/reference/firmware/) section of the Particle documentation.
+- It contains the POSIX wrappers from Device OS: [https://github.com/particle-iot/device-os/tree/develop/hal/src/nRF52840/littlefs](https://github.com/particle-iot/device-os/tree/develop/hal/src/nRF52840/littlefs).
 
-#### ```project.properties``` file:  
-This is the file that specifies the name and version number of the libraries that your project depends on. Dependencies are added automatically to your `project.properties` file when you add a library to a project using the `particle library add` command in the CLI or add a library in the Desktop IDE.
+- It contains other hacked bits of Device OS needed to make it compile and link from user firmware.
 
-## Adding additional files to your project
+- The POSIX file system API calls are the same as [are documented for the Boron](https://docs.particle.io/reference/device-os/firmware/boron/#file-system).
 
-#### Projects with multiple sources
-If you would like add additional files to your application, they should be added to the `/src` folder. All files in the `/src` folder will be sent to the Particle Cloud to produce a compiled binary.
+- Tested with Winbond, ISSI, and Macronix SPI NOR flash chips.  
 
-#### Projects with external libraries
-If your project includes a library that has not been registered in the Particle libraries system, you should create a new folder named `/lib/<libraryname>/src` under `/<project dir>` and add the `.h`, `.cpp` & `library.properties` files for your library there. Read the [Firmware Libraries guide](https://docs.particle.io/guide/tools-and-features/libraries/) for more details on how to develop libraries. Note that all contents of the `/lib` folder and subfolders will also be sent to the Cloud for compilation.
+- It even works with the MX25L25645G 256 Mbit (32 Mbyte) flash chip, which I could not get to work reliably with SPIFFS. See note in LargeFileTest.cpp; you must enable 32-bit addressing in SpiFlashRK using `spiFlash.set4ByteAddressing(true);` for this to work properly.
 
-## Compiling your project
+## Usage
 
-When you're ready to compile your project, make sure you have the correct Particle device target selected and run `particle compile <platform>` in the CLI or click the Compile button in the Desktop IDE. The following files in your project folder will be sent to the compile service:
+You'll probably need some includes:
 
-- Everything in the `/src` folder, including your `.ino` application file
-- The `project.properties` file for your project
-- Any libraries stored under `lib/<libraryname>/src`
+```cpp
+#include "LittleExtFS.h"
+
+#include <dirent.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+using namespace nsLittleExtFS;
+```
+
+This code uses the [SpiFlashRK library](https://github.com/rickkas7/SpiFlashRK) to interface to the flash chip. You typically use one of these lines depending on the brand, SPI port, and CS line:
+
+```cpp
+// Pick a chip, port, and CS line
+// SpiFlashISSI spiFlash(SPI, A5);
+// SpiFlashWinbond spiFlash(SPI, A5);
+// SpiFlashMacronix spiFlash(SPI, A5);
+// SpiFlashWinbond spiFlash(SPI, A5);
+// SpiFlashMacronix spiFlash(SPI, A5);
+```
+
+You then allocate a `LittleExtFS` object as a global:
+
+```
+LittleExtFS fs(&spiFlash, 0, 256);
+```
+
+The parameters are:
+
+- `&spiFlash` the object for your flash chip
+- `0` the start sector for the file system (0 = beginning of chip)
+- `256` replace with the number of 4096-byte sectors to use for the file system. 256 * 4096 = 1,048,576 bytes = 1 Mbyte, the size of an 8 Mbit SPI flash chip. 
+
+Note: You must only ever allocate one LittleExtFS object. Bad things will happen if you create more than one. You can allocate it with `new` but don't allocate it on the stack.
+
+Finally, in `setup()`, initialize the SPI flash and mount the file system. This will format it if it has not been formatted.
+
+```cpp
+spiFlash.begin();
+int res = fs.mount();
+Log.info("fs.mount() = %d", res);
+```
+
+## Testing
+
+There is no functional test program yet, I'm still updating the example from the original library:
+
+- FileSystemTest: A simple app
+- LargeFileTest: A test that writes larger files to test performance
+
+
+## Version History
+
+### 0.0.1 (2023-03-27)
+
+- Initial testing version. It probably still has bugs!
+
