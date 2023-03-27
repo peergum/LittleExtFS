@@ -4,6 +4,8 @@
 
 Port of LittleFS for Particle Gen 3 devices (external memory chip, as opposed to Particle's own implementation of LittleFS on the 2MB internal memory).
 
+_Tested with a Boron on DeviceOS 5.1.0_
+
 **Warning:** This only works on Gen 3 devices (Argon, Boron, B Series...), although I actually **only** tested it on the Boron! For Gen 2 devices, please use Rick's version instead.
 
 **Warning:** As this point in time, it's just a proof-of-concept for testing. There are almost certainly still bugs that haven't been found yet as it has not been extensively tested yet!
